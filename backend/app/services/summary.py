@@ -1,18 +1,18 @@
-from datetime import datetime
-
 from app.models import Patient, PatientNote
 from app.utils import calculate_age
 
 
 def generate_patient_summary(patient: Patient, notes: list[PatientNote]) -> dict:
-    """Template-based summary synthesis from patient profile and clinical notes."""
+    """Template-based summary synthesis from patient profile and clinical notes.
+
+    Expects notes pre-sorted by note_timestamp ASC from the database.
+    """
     name = f"{patient.first_name} {patient.last_name}"
     age = calculate_age(patient.date_of_birth)
     blood = patient.blood_type or "Unknown"
     conditions = patient.conditions or "None documented"
     allergies = patient.allergies or "None documented"
 
-    sorted_notes = sorted(notes, key=lambda n: n.note_timestamp)
     key_points: list[str] = []
 
     if patient.conditions:
@@ -21,7 +21,8 @@ def generate_patient_summary(patient: Patient, notes: list[PatientNote]) -> dict
         key_points.append(f"Known allergies: {patient.allergies}")
     key_points.append(f"Current status: {patient.status.value}")
 
-    if sorted_notes:
+    if notes:
+        recent_notes = notes[-10:]
         narrative_parts = [
             f"{name} is a {age}-year-old patient with blood type {blood}.",
             f"Clinical conditions on file include {conditions}.",
@@ -29,19 +30,19 @@ def generate_patient_summary(patient: Patient, notes: list[PatientNote]) -> dict
             "",
             "Clinical note timeline:",
         ]
-        for note in sorted_notes[-10:]:
+        for note in recent_notes:
             ts = note.note_timestamp.strftime("%Y-%m-%d %H:%M")
-            narrative_parts.append(f"  • [{ts}] {note.content}")
-        if len(sorted_notes) > 10:
+            narrative_parts.append(f"  \u2022 [{ts}] {note.content}")
+        if len(notes) > 10:
             narrative_parts.append(
-                f"  … and {len(sorted_notes) - 10} earlier note(s) on record."
+                f"  \u2026 and {len(notes) - 10} earlier note(s) on record."
             )
-        recent = sorted_notes[-1]
+        most_recent = notes[-1]
         narrative_parts.extend(
             [
                 "",
-                f"Most recent documentation ({recent.note_timestamp.strftime('%B %d, %Y')}): "
-                f"{recent.content}",
+                f"Most recent documentation ({most_recent.note_timestamp.strftime('%B %d, %Y')}): "
+                f"{most_recent.content}",
             ]
         )
         narrative = "\n".join(narrative_parts)

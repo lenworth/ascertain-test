@@ -73,6 +73,14 @@ export interface ApiError {
   detail: string | Array<{ loc: string[]; msg: string; type: string }>
 }
 
+export interface PatientStats {
+  total: number
+  active: number
+  inactive: number
+  critical: number
+  discharged: number
+}
+
 export interface PatientListParams {
   page?: number
   page_size?: number

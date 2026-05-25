@@ -111,5 +111,13 @@ class ErrorResponse(BaseModel):
     detail: str | list[dict]
 
 
+class PatientStats(BaseModel):
+    total: int
+    active: int
+    inactive: int
+    critical: int
+    discharged: int
+
+
 SortField = Literal["name", "age", "last_visit", "status"]
 SortOrder = Literal["asc", "desc"]

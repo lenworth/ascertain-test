@@ -24,9 +24,9 @@ export function PatientDetailPage() {
   const updateMutation = useMutation({
     mutationFn: (values: PatientFormValues) =>
       api.updatePatient(patientId, cleanFormValues(values)),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['patient', patientId] })
-      queryClient.invalidateQueries({ queryKey: ['patients'] })
+    onSuccess: (updatedPatient) => {
+      queryClient.setQueryData(['patient', patientId], updatedPatient)
+      queryClient.invalidateQueries({ queryKey: ['patients'], exact: false })
       queryClient.invalidateQueries({ queryKey: ['summary', patientId] })
       setEditing(false)
       setServerError(null)
@@ -37,7 +37,8 @@ export function PatientDetailPage() {
   const deleteMutation = useMutation({
     mutationFn: () => api.deletePatient(patientId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['patients'] })
+      queryClient.removeQueries({ queryKey: ['patient', patientId] })
+      queryClient.invalidateQueries({ queryKey: ['patients'], exact: false })
       navigate('/patients')
     },
     onError: (err) => setServerError(formatApiError(err)),

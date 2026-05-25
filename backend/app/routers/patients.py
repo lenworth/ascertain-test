@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import asc, desc, func, or_
+from sqlalchemy import asc, desc, func, literal, or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -13,6 +13,7 @@ from app.schemas import (
     PatientCreate,
     PatientListItem,
     PatientResponse,
+    PatientStats,
     PatientSummary,
     PatientUpdate,
     SortField,
@@ -34,6 +35,22 @@ def _get_patient_or_404(db: Session, patient_id: int) -> Patient:
     return patient
 
 
+@router.get("/stats", response_model=PatientStats)
+def get_patient_stats(db: Session = Depends(get_db)):
+    """Single query returning counts per status."""
+    rows = (
+        db.query(Patient.status, func.count(Patient.id))
+        .group_by(Patient.status)
+        .all()
+    )
+    counts = {s.value: 0 for s in PatientStatus}
+    total = 0
+    for patient_status, count in rows:
+        counts[patient_status.value] = count
+        total += count
+    return PatientStats(total=total, **counts)
+
+
 @router.get("", response_model=PaginatedPatients)
 def list_patients(
     page: int = Query(1, ge=1),
@@ -44,7 +61,9 @@ def list_patients(
     sort_order: SortOrder = Query("asc"),
     db: Session = Depends(get_db),
 ):
-    query = db.query(Patient)
+    # Use window function to get total count in the same query
+    total_window = func.count(Patient.id).over().label("_total")
+    query = db.query(Patient, total_window)
 
     if search:
         term = f"%{search.strip()}%"
@@ -60,23 +79,31 @@ def list_patients(
     if status_filter:
         query = query.filter(Patient.status == status_filter)
 
-    total = query.with_entities(func.count(Patient.id)).scalar() or 0
-
-    order_col = {
-        "name": Patient.last_name,
-        "age": Patient.date_of_birth,
-        "last_visit": Patient.last_visit,
-        "status": Patient.status,
-    }[sort_by]
+    # Sort direction: age sort inverts because older DOB = higher age
     if sort_by == "age":
         order_col = Patient.date_of_birth
-        direction = asc if sort_order == "desc" else desc
+        direction = desc if sort_order == "asc" else asc
     else:
+        order_col = {
+            "name": Patient.last_name,
+            "last_visit": Patient.last_visit,
+            "status": Patient.status,
+        }[sort_by]
         direction = asc if sort_order == "asc" else desc
     query = query.order_by(direction(order_col), Patient.first_name)
 
     offset = (page - 1) * page_size
-    patients = query.offset(offset).limit(page_size).all()
+    rows = query.offset(offset).limit(page_size).all()
+
+    if rows:
+        total = rows[0]._total
+    else:
+        total = (
+            db.query(func.count(Patient.id))
+            .filter(Patient.status == status_filter if status_filter else literal(True))
+            .scalar()
+            or 0
+        ) if page > 1 else 0
 
     items = [
         PatientListItem(
@@ -87,7 +114,7 @@ def list_patients(
             last_visit=p.last_visit,
             status=p.status,
         )
-        for p in patients
+        for p, _ in rows
     ]
 
     total_pages = max(1, (total + page_size - 1) // page_size)
@@ -200,6 +227,7 @@ def get_patient_summary(patient_id: int, db: Session = Depends(get_db)):
     notes = (
         db.query(PatientNote)
         .filter(PatientNote.patient_id == patient_id)
+        .order_by(PatientNote.note_timestamp.asc())
         .all()
     )
     return generate_patient_summary(patient, notes)

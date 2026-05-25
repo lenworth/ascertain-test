@@ -37,7 +37,7 @@ export function PatientList() {
     count: data?.items.length ?? 0,
     getScrollElement: () => parentRef.current,
     estimateSize: () => 88,
-    overscan: 5,
+    overscan: 12,
   })
 
   return (

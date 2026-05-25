@@ -5,6 +5,7 @@ import type {
   PatientFormData,
   PatientListParams,
   PatientNote,
+  PatientStats,
   PatientSummary,
 } from '../types/patient'
 
@@ -92,6 +93,8 @@ export const api = {
 
   getSummary: (patientId: number) =>
     request<PatientSummary>(`/patients/${patientId}/summary`),
+
+  getStats: () => request<PatientStats>('/patients/stats'),
 }
 
 export function formatApiError(error: unknown): string {

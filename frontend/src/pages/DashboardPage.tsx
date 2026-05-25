@@ -11,20 +11,8 @@ export function DashboardPage() {
 
   const statusCounts = useQuery({
     queryKey: ['patients', 'stats'],
-    queryFn: async () => {
-      const [active, critical, inactive, discharged] = await Promise.all([
-        api.listPatients({ status: 'active', page_size: 1 }),
-        api.listPatients({ status: 'critical', page_size: 1 }),
-        api.listPatients({ status: 'inactive', page_size: 1 }),
-        api.listPatients({ status: 'discharged', page_size: 1 }),
-      ])
-      return {
-        active: active.total,
-        critical: critical.total,
-        inactive: inactive.total,
-        discharged: discharged.total,
-      }
-    },
+    queryFn: () => api.getStats(),
+    staleTime: 60_000,
   })
 
   return (
